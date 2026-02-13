@@ -4,7 +4,7 @@ export default function LoginPage() {
       <div className="w-full max-w-md rounded-2xl bg-white p-8 shadow-xl">
         {/* Header */}
         <div className="mb-8 text-center">
-          <h1 className="text-2xl font-bold text-gray-800">로그인</h1>
+          <h1 className="text-2xl font-bold text-gray-800">Blood Press Logs</h1>
           <p className="mt-2 text-sm text-gray-500">계정 정보를 입력해주세요</p>
         </div>
 
@@ -49,7 +49,7 @@ export default function LoginPage() {
             type="submit"
             className="w-full rounded-lg bg-blue-600 py-3 font-medium text-white transition-all hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 active:scale-[0.98]"
           >
-            로그인
+            Blood Press Logs
           </button>
         </form>
 
