@@ -1,4 +1,16 @@
+'use client';
+
+import { useRouter } from 'next/navigation';
+
 export default function LoginPage() {
+  const router = useRouter();
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    // 로그인 성공 시 writer 페이지로 이동
+    router.push('/writer');
+  };
+
   return (
     <div className="flex min-h-screen items-center justify-center bg-gradient-to-br from-blue-50 to-indigo-100 p-4">
       <div className="w-full max-w-md rounded-2xl bg-white p-8 shadow-xl">
@@ -9,7 +21,7 @@ export default function LoginPage() {
         </div>
 
         {/* Login Form */}
-        <form className="space-y-6">
+        <form onSubmit={handleSubmit} className="space-y-6">
           {/* ID Field */}
           <div>
             <label 
