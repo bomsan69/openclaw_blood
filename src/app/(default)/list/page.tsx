@@ -1,68 +1,85 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 
 interface BloodPressureRecord {
   id: number;
-  date: string;
   high: number;
   low: number;
   plus: number;
+  measured_at: string;
+  created_at: string;
 }
 
-// 샘플 데이터
-const sampleData: BloodPressureRecord[] = [
-  { id: 1, date: '2026-02-13', high: 120, low: 80, plus: 72 },
-  { id: 2, date: '2026-02-12', high: 118, low: 78, plus: 70 },
-  { id: 3, date: '2026-02-11', high: 122, low: 82, plus: 75 },
-  { id: 4, date: '2026-02-10', high: 119, low: 79, plus: 71 },
-  { id: 5, date: '2026-02-09', high: 121, low: 81, plus: 73 },
-  { id: 6, date: '2026-02-08', high: 117, low: 77, plus: 69 },
-  { id: 7, date: '2026-02-07', high: 123, low: 83, plus: 74 },
-  { id: 8, date: '2026-02-06', high: 120, low: 80, plus: 72 },
-  { id: 9, date: '2026-02-05', high: 118, low: 78, plus: 70 },
-  { id: 10, date: '2026-02-04', high: 121, low: 81, plus: 73 },
-  { id: 11, date: '2026-02-03', high: 119, low: 79, plus: 71 },
-  { id: 12, date: '2026-02-02', high: 122, low: 82, plus: 75 },
-];
+interface ApiResponse {
+  records: BloodPressureRecord[];
+  total: number;
+  page: number;
+  totalPages: number;
+}
 
 export default function ListPage() {
+  const router = useRouter();
+  const [user, setUser] = useState<{id: number, username: string} | null>(null);
+  const [records, setRecords] = useState<BloodPressureRecord[]>([]);
+  const [loading, setLoading] = useState(true);
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
   const [currentPage, setCurrentPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
+  const [total, setTotal] = useState(0);
   const itemsPerPage = 10;
 
-  // 필터링된 데이터
-  const filteredData = sampleData.filter((record) => {
-    if (!startDate && !endDate) return true;
-    const recordDate = new Date(record.date);
-    const start = startDate ? new Date(startDate) : null;
-    const end = endDate ? new Date(endDate) : null;
-    
-    if (start && end) {
-      return recordDate >= start && recordDate <= end;
-    } else if (start) {
-      return recordDate >= start;
-    } else if (end) {
-      return recordDate <= end;
+  useEffect(() => {
+    const stored = localStorage.getItem('user');
+    if (!stored) {
+      router.push('/');
+      return;
     }
-    return true;
-  });
+    const parsed = JSON.parse(stored);
+    setUser(parsed);
+    fetchRecords(parsed.id, currentPage);
+  }, [router, currentPage]);
 
-  // 페이지네이션
-  const totalPages = Math.ceil(filteredData.length / itemsPerPage);
-  const startIndex = (currentPage - 1) * itemsPerPage;
-  const paginatedData = filteredData.slice(startIndex, startIndex + itemsPerPage);
+  const fetchRecords = async (userId: number, page: number) => {
+    setLoading(true);
+    try {
+      const params = new URLSearchParams({
+        userId: String(userId),
+        page: String(page),
+        limit: String(itemsPerPage)
+      });
+      
+      if (startDate) params.append('startDate', startDate);
+      if (endDate) params.append('endDate', endDate);
+      
+      const res = await fetch(`/api/blood?${params}`);
+      const data: ApiResponse = await res.json();
+      
+      if (res.ok) {
+        setRecords(data.records);
+        setTotal(data.total);
+        setTotalPages(data.totalPages);
+      }
+    } catch (err) {
+      console.error('Failed to fetch records:', err);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const handleFilter = () => {
-    setCurrentPage(1); // 필터 적용 시 첫 페이지로
+    setCurrentPage(1);
+    if (user) fetchRecords(user.id, 1);
   };
 
   const handleReset = () => {
     setStartDate('');
     setEndDate('');
     setCurrentPage(1);
+    if (user) fetchRecords(user.id, 1);
   };
 
   const formatDate = (dateString: string) => {
@@ -70,18 +87,28 @@ export default function ListPage() {
     return `${date.getFullYear()}. ${date.getMonth() + 1}. ${date.getDate()}.`;
   };
 
+  const handleLogout = () => {
+    localStorage.removeItem('user');
+    router.push('/');
+  };
+
+  if (!user) return null;
+
   return (
     <div className="min-h-screen bg-gray-50">
       {/* Header */}
       <header className="bg-white shadow-sm sticky top-0 z-10">
         <div className="max-w-md mx-auto px-4 h-14 flex items-center justify-between">
           <h1 className="text-lg font-bold text-gray-800">Blood Press Log</h1>
-          <Link 
-            href="/writer"
-            className="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 transition-colors"
-          >
-            기록하기
-          </Link>
+          <div className="flex items-center space-x-2">
+            <span className="text-sm text-gray-500">{user.username}</span>
+            <Link 
+              href="/writer"
+              className="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 transition-colors"
+            >
+              기록하기
+            </Link>
+          </div>
         </div>
       </header>
 
@@ -131,47 +158,50 @@ export default function ListPage() {
 
         {/* 테이블 */}
         <div className="bg-white rounded-2xl shadow-sm overflow-hidden">
-          <div className="overflow-x-auto">
-            <table className="min-w-full divide-y divide-gray-200">
-              <thead className="bg-gray-50">
-                <tr>
-                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    등록일
-                  </th>
-                  <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    High
-                  </th>
-                  <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Low
-                  </th>
-                  <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Plus
-                  </th>
-                </tr>
-              </thead>
-              <tbody className="bg-white divide-y divide-gray-200">
-                {paginatedData.map((record) => (
-                  <tr key={record.id} className="hover:bg-gray-50">
-                    <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-900">
-                      {formatDate(record.date)}
-                    </td>
-                    <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-900 text-center">
-                      {record.high}
-                    </td>
-                    <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-900 text-center">
-                      {record.low}
-                    </td>
-                    <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-900 text-center">
-                      {record.plus}
-                    </td>
+          {loading ? (
+            <div className="py-8 text-center text-gray-500">로딩 중...</div>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="min-w-full divide-y divide-gray-200">
+                <thead className="bg-gray-50">
+                  <tr>
+                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      등록일
+                    </th>
+                    <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      High
+                    </th>
+                    <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Low
+                    </th>
+                    <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Plus
+                    </th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+                </thead>
+                <tbody className="bg-white divide-y divide-gray-200">
+                  {records.map((record) => (
+                    <tr key={record.id} className="hover:bg-gray-50">
+                      <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-900">
+                        {formatDate(record.measured_at)}
+                      </td>
+                      <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-900 text-center">
+                        {record.high}
+                      </td>
+                      <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-900 text-center">
+                        {record.low}
+                      </td>
+                      <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-900 text-center">
+                        {record.plus}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
 
-          {/* 데이터 없음 */}
-          {paginatedData.length === 0 && (
+          {!loading && records.length === 0 && (
             <div className="py-8 text-center text-gray-500">
               해당 기간의 데이터가 없습니다.
             </div>
@@ -206,9 +236,7 @@ export default function ListPage() {
                   </button>
                 );
               })}
-              {totalPages > 5 && (
-                <span className="text-gray-500 px-2">...</span>
-              )}
+              {totalPages > 5 && <span className="text-gray-500 px-2">...</span>}
             </div>
 
             <button
@@ -221,9 +249,15 @@ export default function ListPage() {
           </div>
         )}
 
-        {/* 총 개수 표시 */}
-        <div className="text-center text-sm text-gray-500">
-          총 {filteredData.length}개의 기록
+        {/* 총 개수 및 로그아웃 */}
+        <div className="flex items-center justify-between">
+          <span className="text-sm text-gray-500">총 {total}개의 기록</span>
+          <button
+            onClick={handleLogout}
+            className="text-sm text-red-500 hover:text-red-600"
+          >
+            로그아웃
+          </button>
         </div>
       </main>
     </div>
