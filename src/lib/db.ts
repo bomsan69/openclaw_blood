@@ -78,7 +78,7 @@ export function getBloodPressureRecords(
   query += ' ORDER BY measured_at DESC LIMIT ? OFFSET ?';
   
   const records = db.prepare(query).all(...params, limit, offset);
-  const { total } = db.prepare(countQuery).get(...params.slice(0, -2)) as { total: number };
+  const { total } = db.prepare(countQuery).get(...params) as { total: number };
   
   return {
     records,

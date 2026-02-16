@@ -34,6 +34,7 @@ export default function WriterPage() {
   const [capturedImage, setCapturedImage] = useState<string | null>(null);
   const [recognizing, setRecognizing] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const nextSlotRef = useRef<'first' | 'second'>('first');
 
   useEffect(() => {
     const stored = localStorage.getItem('user');
@@ -64,16 +65,51 @@ export default function WriterPage() {
       alert('먼저 사진을 촬영해주세요.');
       return;
     }
-    
+
     setRecognizing(true);
-    // TODO: OCR API 연동
-    // 현재는 데모용으로 임시 값 설정
-    setTimeout(() => {
-      setFirstResult({ high: '120', low: '80', plus: '72' });
-      setSecondResult({ high: '118', low: '78', plus: '70' });
-      setRecognizing(false);
+    try {
+      const res = await fetch('/api/ocr', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ image: capturedImage })
+      });
+
+      if (!res.ok) throw new Error('OCR failed');
+
+      const data = await res.json();
+      const recognized: BloodPressureData = {
+        high: data.high,
+        low: data.low,
+        plus: data.plus
+      };
+
+      const isFirstEmpty = !firstResult.high && !firstResult.low && !firstResult.plus;
+      const isSecondEmpty = !secondResult.high && !secondResult.low && !secondResult.plus;
+
+      if (isFirstEmpty) {
+        setFirstResult(recognized);
+        nextSlotRef.current = 'second';
+      } else if (isSecondEmpty) {
+        setSecondResult(recognized);
+        nextSlotRef.current = 'first';
+      } else {
+        // 둘 다 값이 있으면 순서대로 반복 대체
+        if (nextSlotRef.current === 'first') {
+          setFirstResult(recognized);
+          nextSlotRef.current = 'second';
+        } else {
+          setSecondResult(recognized);
+          nextSlotRef.current = 'first';
+        }
+      }
+
+      setCapturedImage(null);
       alert('인식 완료! 값이 자동으로 입력되었습니다.');
-    }, 2000);
+    } catch (err) {
+      alert('OCR 인식 중 오류가 발생했습니다.');
+    } finally {
+      setRecognizing(false);
+    }
   };
 
   const handleSave = async () => {
@@ -82,47 +118,45 @@ export default function WriterPage() {
       return;
     }
 
-    if (firstResult.high && firstResult.low && firstResult.plus) {
-      setLoading(true);
-      try {
-        const res = await fetch('/api/blood', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            userId: user.id,
-            high: Number(firstResult.high),
-            low: Number(firstResult.low),
-            plus: Number(firstResult.plus),
-            measuredAt: measuredDate
-          })
-        });
-
-        if (!res.ok) throw new Error('Failed to save');
-
-        if (secondResult.high && secondResult.low && secondResult.plus) {
-          const res2 = await fetch('/api/blood', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              userId: user.id,
-              high: Number(secondResult.high),
-              low: Number(secondResult.low),
-              plus: Number(secondResult.plus),
-              measuredAt: measuredDate
-            })
-          });
-          if (!res2.ok) throw new Error('Failed to save second result');
-        }
-
-        alert('저장되었습니다!');
-        router.push('/list');
-      } catch (err) {
-        alert('저장 중 오류가 발생했습니다.');
-      } finally {
-        setLoading(false);
-      }
-    } else {
+    if (!firstResult.high || !firstResult.low || !firstResult.plus) {
       alert('첫 번째 측정값을 모두 입력해주세요.');
+      return;
+    }
+
+    const hasSecond = secondResult.high && secondResult.low && secondResult.plus;
+
+    const high = hasSecond
+      ? Math.round((Number(firstResult.high) + Number(secondResult.high)) / 2)
+      : Number(firstResult.high);
+    const low = hasSecond
+      ? Math.round((Number(firstResult.low) + Number(secondResult.low)) / 2)
+      : Number(firstResult.low);
+    const plus = hasSecond
+      ? Math.round((Number(firstResult.plus) + Number(secondResult.plus)) / 2)
+      : Number(firstResult.plus);
+
+    setLoading(true);
+    try {
+      const res = await fetch('/api/blood', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          userId: user.id,
+          high,
+          low,
+          plus,
+          measuredAt: measuredDate
+        })
+      });
+
+      if (!res.ok) throw new Error('Failed to save');
+
+      alert('저장되었습니다!');
+      router.push('/list');
+    } catch (err) {
+      alert('저장 중 오류가 발생했습니다.');
+    } finally {
+      setLoading(false);
     }
   };
 
