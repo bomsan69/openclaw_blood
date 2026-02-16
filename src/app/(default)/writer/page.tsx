@@ -10,6 +10,32 @@ interface BloodPressureData {
   plus: string;
 }
 
+function InputField({
+  label,
+  value,
+  onChange,
+  placeholder
+}: {
+  label: string;
+  value: string;
+  onChange: (value: string) => void;
+  placeholder: string;
+}) {
+  return (
+    <div className="flex flex-col items-center">
+      <label className="text-sm font-medium text-gray-700 mb-2">{label}</label>
+      <input
+        type="number"
+        inputMode="numeric"
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        placeholder={placeholder}
+        className="w-full max-w-20 h-12 text-center text-lg font-semibold border-2 border-gray-300 rounded-lg focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-200"
+      />
+    </div>
+  );
+}
+
 export default function WriterPage() {
   const router = useRouter();
   const [user, setUser] = useState<{id: number, username: string} | null>(null);
@@ -160,30 +186,6 @@ export default function WriterPage() {
     }
   };
 
-  const InputField = ({ 
-    label, 
-    value, 
-    onChange, 
-    placeholder 
-  }: { 
-    label: string; 
-    value: string; 
-    onChange: (value: string) => void;
-    placeholder: string;
-  }) => (
-    <div className="flex flex-col items-center">
-      <label className="text-sm font-medium text-gray-700 mb-2">{label}</label>
-      <input
-        type="number"
-        inputMode="numeric"
-        value={value}
-        onChange={(e) => onChange(e.target.value)}
-        placeholder={placeholder}
-        className="w-full max-w-[80px] h-12 text-center text-lg font-semibold border-2 border-gray-300 rounded-lg focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-200"
-      />
-    </div>
-  );
-
   if (!user) return null;
 
   return (
@@ -192,7 +194,7 @@ export default function WriterPage() {
       <header className="bg-white shadow-sm sticky top-0 z-10">
         <div className="max-w-md mx-auto px-4 h-14 flex items-center justify-between">
           <h1 className="text-lg font-bold text-gray-800">Blood Press Log</h1>
-          <Link 
+          <Link
             href="/list"
             className="px-4 py-2 text-sm font-medium text-gray-600 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors"
           >
