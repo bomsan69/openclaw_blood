@@ -2,7 +2,6 @@
 
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import Link from 'next/link';
 import * as XLSX from 'xlsx';
 
 interface BloodPressureRecord {
@@ -21,11 +20,19 @@ interface ApiResponse {
   totalPages: number;
 }
 
+function getBpLevel(high: number, low: number): { label: string; color: string; bg: string } {
+  if (high >= 180 || low >= 120) return { label: '위험', color: 'text-red-600', bg: 'bg-red-50' };
+  if (high >= 140 || low >= 90) return { label: '높음', color: 'text-orange-600', bg: 'bg-orange-50' };
+  if (high >= 120 || low >= 80) return { label: '주의', color: 'text-amber-600', bg: 'bg-amber-50' };
+  return { label: '정상', color: 'text-emerald-600', bg: 'bg-emerald-50' };
+}
+
 export default function ListPage() {
   const router = useRouter();
   const [user, setUser] = useState<{id: number, username: string} | null>(null);
   const [records, setRecords] = useState<BloodPressureRecord[]>([]);
   const [loading, setLoading] = useState(true);
+  const [filterOpen, setFilterOpen] = useState(false);
   const [startDate, setStartDate] = useState(() => {
     const d = new Date();
     d.setDate(d.getDate() - 7);
@@ -58,13 +65,13 @@ export default function ListPage() {
         page: String(page),
         limit: String(itemsPerPage)
       });
-      
+
       if (startDate) params.append('startDate', startDate);
       if (endDate) params.append('endDate', endDate);
-      
+
       const res = await fetch(`/api/blood?${params}`);
       const data: ApiResponse = await res.json();
-      
+
       if (res.ok) {
         setRecords(data.records);
         setTotal(data.total);
@@ -79,6 +86,7 @@ export default function ListPage() {
 
   const handleFilter = () => {
     setCurrentPage(1);
+    setFilterOpen(false);
     if (user) fetchRecords(user.id, 1);
   };
 
@@ -91,7 +99,13 @@ export default function ListPage() {
 
   const formatDate = (dateString: string) => {
     const date = new Date(dateString);
-    return `${date.getFullYear()}. ${date.getMonth() + 1}. ${date.getDate()}.`;
+    return `${date.getMonth() + 1}/${date.getDate()}`;
+  };
+
+  const formatDateFull = (dateString: string) => {
+    const date = new Date(dateString);
+    const days = ['일', '월', '화', '수', '목', '금', '토'];
+    return `${date.getFullYear()}.${date.getMonth() + 1}.${date.getDate()} (${days[date.getDay()]})`;
   };
 
   const handleLogout = () => {
@@ -101,54 +115,46 @@ export default function ListPage() {
 
   const handleDownloadExcel = async () => {
     if (!user) return;
-    
+
     try {
       const params = new URLSearchParams({
         userId: String(user.id),
         page: '1',
-        limit: '9999'  // 모든 데이터 가져오기
+        limit: '9999'
       });
-      
+
       if (startDate) params.append('startDate', startDate);
       if (endDate) params.append('endDate', endDate);
-      
+
       const res = await fetch(`/api/blood?${params}`);
       const data: ApiResponse = await res.json();
-      
+
       if (!res.ok || !data.records.length) {
         alert('다운로드할 데이터가 없습니다.');
         return;
       }
 
-      // 엑셀 데이터 준비
       const excelData = data.records.map((record, index) => ({
         'No': index + 1,
-        '등록일': formatDate(record.measured_at),
-        'High': record.high,
-        'Low': record.low,
-        'Plus': record.plus
+        '측정일': formatDateFull(record.measured_at),
+        '수축기(High)': record.high,
+        '이완기(Low)': record.low,
+        '맥박(Plus)': record.plus
       }));
 
-      // 워크시트 생성
       const ws = XLSX.utils.json_to_sheet(excelData);
-      
-      // 컬럼 너비 설정
       ws['!cols'] = [
-        { wch: 5 },   // No
-        { wch: 15 },  // 등록일
-        { wch: 10 },  // High
-        { wch: 10 },  // Low
-        { wch: 10 }   // Plus
+        { wch: 5 },
+        { wch: 20 },
+        { wch: 12 },
+        { wch: 12 },
+        { wch: 12 }
       ];
 
-      // 워크북 생성
       const wb = XLSX.utils.book_new();
       XLSX.utils.book_append_sheet(wb, ws, '혈압기록');
 
-      // 파일명 생성 (날짜 범위 포함)
       const fileName = `혈압기록_${startDate || 'all'}_${endDate || 'all'}.xlsx`;
-      
-      // 다운로드
       XLSX.writeFile(wb, fileName);
     } catch (err) {
       console.error('Download failed:', err);
@@ -161,178 +167,202 @@ export default function ListPage() {
   return (
     <div className="min-h-screen bg-gray-50">
       {/* Header */}
-      <header className="bg-white shadow-sm sticky top-0 z-10">
+      <header className="bg-white sticky top-0 z-10 border-b border-gray-100">
         <div className="max-w-md mx-auto px-4 h-14 flex items-center justify-between">
-          <h1 className="text-lg font-bold text-gray-800">Blood Press Log</h1>
-          <div className="flex items-center space-x-2">
+          <h1 className="text-lg font-semibold text-gray-900">기록 목록</h1>
+          <div className="flex items-center gap-1">
             <button
-              onClick={handleDownloadExcel}
-              className="p-2 text-gray-600 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
-              title="엑셀 다운로드"
+              onClick={() => setFilterOpen(!filterOpen)}
+              className={`p-2 rounded-full transition-colors ${
+                filterOpen ? 'bg-blue-50 text-blue-600' : 'text-gray-500 active:bg-gray-100'
+              }`}
             >
               <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z" />
               </svg>
             </button>
-            <span className="text-sm text-gray-500">{user.username}</span>
-            <Link 
-              href="/writer"
-              className="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 transition-colors"
+            <button
+              onClick={handleDownloadExcel}
+              className="p-2 rounded-full text-gray-500 active:bg-gray-100 transition-colors"
             >
-              기록하기
-            </Link>
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+              </svg>
+            </button>
+            <button
+              onClick={handleLogout}
+              className="p-2 rounded-full text-gray-500 active:bg-gray-100 transition-colors"
+            >
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
+              </svg>
+            </button>
           </div>
         </div>
-      </header>
 
-      {/* Main Content */}
-      <main className="max-w-md mx-auto px-4 py-6 space-y-4">
-        {/* 날짜 필터 */}
-        <div className="bg-white rounded-2xl shadow-sm p-4">
-          <h2 className="text-sm font-semibold text-gray-700 mb-3">날짜 필터</h2>
-          <div className="space-y-3">
-            <div className="flex items-center space-x-2">
-              <div className="flex-1">
-                <label className="block text-xs text-gray-500 mb-1">시작일</label>
-                <input
-                  type="date"
-                  value={startDate}
-                  onChange={(e) => setStartDate(e.target.value)}
-                  className="w-full px-3 py-2 text-sm bg-white border-2 border-gray-400 rounded-lg focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-200 text-gray-800"
-                />
-              </div>
-              <span className="text-gray-400 pt-5">~</span>
-              <div className="flex-1">
-                <label className="block text-xs text-gray-500 mb-1">종료일</label>
-                <input
-                  type="date"
-                  value={endDate}
-                  onChange={(e) => setEndDate(e.target.value)}
-                  className="w-full px-3 py-2 text-sm bg-white border-2 border-gray-400 rounded-lg focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-200 text-gray-800"
-                />
-              </div>
+        {/* Collapsible Filter */}
+        <div
+          className={`overflow-hidden transition-all duration-200 ${
+            filterOpen ? 'max-h-48' : 'max-h-0'
+          }`}
+        >
+          <div className="max-w-md mx-auto px-4 pb-3 space-y-2">
+            <div className="flex items-center gap-2">
+              <input
+                type="date"
+                value={startDate}
+                onChange={(e) => setStartDate(e.target.value)}
+                className="flex-1 px-3 py-2 text-sm bg-gray-50 border border-gray-200 rounded-lg focus:border-blue-400 focus:outline-none text-gray-800"
+              />
+              <span className="text-gray-300 text-sm">~</span>
+              <input
+                type="date"
+                value={endDate}
+                onChange={(e) => setEndDate(e.target.value)}
+                className="flex-1 px-3 py-2 text-sm bg-gray-50 border border-gray-200 rounded-lg focus:border-blue-400 focus:outline-none text-gray-800"
+              />
             </div>
-            <div className="flex space-x-2">
+            <div className="flex gap-2">
               <button
                 onClick={handleFilter}
-                className="flex-1 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 transition-colors"
+                className="flex-1 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg active:bg-blue-700 transition-colors"
               >
                 적용
               </button>
               <button
                 onClick={handleReset}
-                className="flex-1 py-2 text-sm font-medium text-gray-600 bg-gray-200 rounded-lg hover:bg-gray-300 transition-colors"
+                className="px-4 py-2 text-sm font-medium text-gray-500 bg-gray-100 rounded-lg active:bg-gray-200 transition-colors"
               >
                 초기화
               </button>
             </div>
           </div>
         </div>
+      </header>
 
-        {/* 테이블 */}
-        <div className="bg-white rounded-2xl shadow-sm overflow-hidden">
-          {loading ? (
-            <div className="py-8 text-center text-gray-500">로딩 중...</div>
-          ) : (
-            <div className="overflow-x-auto">
-              <table className="min-w-full divide-y divide-gray-200">
-                <thead className="bg-gray-50">
-                  <tr>
-                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      등록일
-                    </th>
-                    <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      High
-                    </th>
-                    <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Low
-                    </th>
-                    <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Plus
-                    </th>
-                  </tr>
-                </thead>
-                <tbody className="bg-white divide-y divide-gray-200">
-                  {records.map((record) => (
-                    <tr key={record.id} className="hover:bg-gray-50">
-                      <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-900">
-                        {formatDate(record.measured_at)}
-                      </td>
-                      <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-900 text-center">
-                        {record.high}
-                      </td>
-                      <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-900 text-center">
-                        {record.low}
-                      </td>
-                      <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-900 text-center">
-                        {record.plus}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )}
-
-          {!loading && records.length === 0 && (
-            <div className="py-8 text-center text-gray-500">
-              해당 기간의 데이터가 없습니다.
-            </div>
+      {/* Content */}
+      <div className="max-w-md mx-auto px-4 pt-3 pb-4">
+        {/* Summary bar */}
+        <div className="flex items-center justify-between mb-3">
+          <p className="text-xs text-gray-400">
+            총 <span className="font-semibold text-gray-600">{total}</span>건
+          </p>
+          {(startDate || endDate) && (
+            <p className="text-xs text-gray-400">
+              {startDate && formatDate(startDate)} ~ {endDate && formatDate(endDate)}
+            </p>
           )}
         </div>
 
-        {/* 페이지네이션 */}
+        {/* Records */}
+        {loading ? (
+          <div className="flex items-center justify-center py-20">
+            <div className="w-6 h-6 border-2 border-blue-200 border-t-blue-600 rounded-full animate-spin" />
+          </div>
+        ) : records.length === 0 ? (
+          <div className="flex flex-col items-center justify-center py-20 text-gray-400">
+            <svg className="w-12 h-12 mb-3 text-gray-200" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
+            </svg>
+            <p className="text-sm">기록이 없습니다</p>
+          </div>
+        ) : (
+          <div className="space-y-2">
+            {records.map((record) => {
+              const level = getBpLevel(record.high, record.low);
+              return (
+                <div
+                  key={record.id}
+                  className="bg-white rounded-xl px-4 py-3 flex items-center gap-4"
+                >
+                  {/* Date */}
+                  <div className="flex-shrink-0 text-center w-12">
+                    <p className="text-lg font-bold text-gray-800 leading-none">
+                      {new Date(record.measured_at).getDate()}
+                    </p>
+                    <p className="text-[10px] text-gray-400 mt-0.5">
+                      {new Date(record.measured_at).getFullYear()}.{new Date(record.measured_at).getMonth() + 1}
+                    </p>
+                  </div>
+
+                  {/* Divider */}
+                  <div className="w-px h-10 bg-gray-100 flex-shrink-0" />
+
+                  {/* BP Values */}
+                  <div className="flex-1 flex items-center gap-3">
+                    <div className="flex-1">
+                      <div className="flex items-baseline gap-1.5">
+                        <span className="text-xl font-bold text-gray-900">{record.high}</span>
+                        <span className="text-gray-300">/</span>
+                        <span className="text-xl font-bold text-gray-900">{record.low}</span>
+                      </div>
+                      <p className="text-xs text-gray-400 mt-0.5">
+                        맥박 <span className="text-gray-600 font-medium">{record.plus}</span>
+                      </p>
+                    </div>
+                  </div>
+
+                  {/* Status Badge */}
+                  <span className={`flex-shrink-0 text-[11px] font-semibold px-2.5 py-1 rounded-full ${level.color} ${level.bg}`}>
+                    {level.label}
+                  </span>
+                </div>
+              );
+            })}
+          </div>
+        )}
+
+        {/* Pagination */}
         {totalPages > 1 && (
-          <div className="flex items-center justify-between bg-white rounded-xl shadow-sm px-4 py-3">
+          <div className="flex items-center justify-center gap-1 mt-4">
             <button
               onClick={() => setCurrentPage((prev) => Math.max(prev - 1, 1))}
               disabled={currentPage === 1}
-              className="px-3 py-1 text-sm font-medium text-gray-700 bg-gray-100 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-200 transition-colors"
+              className="w-9 h-9 flex items-center justify-center rounded-lg text-gray-500 disabled:opacity-30 active:bg-gray-100 transition-colors"
             >
-              이전
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+              </svg>
             </button>
-            
-            <div className="flex items-center space-x-1">
-              {Array.from({ length: Math.min(totalPages, 5) }, (_, i) => {
-                const pageNum = i + 1;
-                return (
-                  <button
-                    key={pageNum}
-                    onClick={() => setCurrentPage(pageNum)}
-                    className={`w-8 h-8 text-sm font-medium rounded-lg transition-colors ${
-                      currentPage === pageNum
-                        ? 'bg-blue-600 text-white'
-                        : 'text-gray-700 hover:bg-gray-100'
-                    }`}
-                  >
-                    {pageNum}
-                  </button>
-                );
-              })}
-              {totalPages > 5 && <span className="text-gray-500 px-2">...</span>}
-            </div>
+
+            {Array.from({ length: Math.min(totalPages, 5) }, (_, i) => {
+              let pageNum: number;
+              if (totalPages <= 5) {
+                pageNum = i + 1;
+              } else if (currentPage <= 3) {
+                pageNum = i + 1;
+              } else if (currentPage >= totalPages - 2) {
+                pageNum = totalPages - 4 + i;
+              } else {
+                pageNum = currentPage - 2 + i;
+              }
+              return (
+                <button
+                  key={pageNum}
+                  onClick={() => setCurrentPage(pageNum)}
+                  className={`w-9 h-9 text-sm font-medium rounded-lg transition-colors ${
+                    currentPage === pageNum
+                      ? 'bg-blue-600 text-white'
+                      : 'text-gray-500 active:bg-gray-100'
+                  }`}
+                >
+                  {pageNum}
+                </button>
+              );
+            })}
 
             <button
               onClick={() => setCurrentPage((prev) => Math.min(prev + 1, totalPages))}
               disabled={currentPage === totalPages}
-              className="px-3 py-1 text-sm font-medium text-gray-700 bg-gray-100 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-200 transition-colors"
+              className="w-9 h-9 flex items-center justify-center rounded-lg text-gray-500 disabled:opacity-30 active:bg-gray-100 transition-colors"
             >
-              다음
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+              </svg>
             </button>
           </div>
         )}
-
-        {/* 총 개수 및 로그아웃 */}
-        <div className="flex items-center justify-between">
-          <span className="text-sm text-gray-500">총 {total}개의 기록</span>
-          <button
-            onClick={handleLogout}
-            className="text-sm text-red-500 hover:text-red-600"
-          >
-            로그아웃
-          </button>
-        </div>
-      </main>
+      </div>
     </div>
   );
 }
