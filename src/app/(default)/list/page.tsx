@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
+import * as XLSX from 'xlsx';
 
 interface BloodPressureRecord {
   id: number;
@@ -98,6 +99,63 @@ export default function ListPage() {
     router.push('/');
   };
 
+  const handleDownloadExcel = async () => {
+    if (!user) return;
+    
+    try {
+      const params = new URLSearchParams({
+        userId: String(user.id),
+        page: '1',
+        limit: '9999'  // 모든 데이터 가져오기
+      });
+      
+      if (startDate) params.append('startDate', startDate);
+      if (endDate) params.append('endDate', endDate);
+      
+      const res = await fetch(`/api/blood?${params}`);
+      const data: ApiResponse = await res.json();
+      
+      if (!res.ok || !data.records.length) {
+        alert('다운로드할 데이터가 없습니다.');
+        return;
+      }
+
+      // 엑셀 데이터 준비
+      const excelData = data.records.map((record, index) => ({
+        'No': index + 1,
+        '등록일': formatDate(record.measured_at),
+        'High': record.high,
+        'Low': record.low,
+        'Plus': record.plus
+      }));
+
+      // 워크시트 생성
+      const ws = XLSX.utils.json_to_sheet(excelData);
+      
+      // 컬럼 너비 설정
+      ws['!cols'] = [
+        { wch: 5 },   // No
+        { wch: 15 },  // 등록일
+        { wch: 10 },  // High
+        { wch: 10 },  // Low
+        { wch: 10 }   // Plus
+      ];
+
+      // 워크북 생성
+      const wb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, ws, '혈압기록');
+
+      // 파일명 생성 (날짜 범위 포함)
+      const fileName = `혈압기록_${startDate || 'all'}_${endDate || 'all'}.xlsx`;
+      
+      // 다운로드
+      XLSX.writeFile(wb, fileName);
+    } catch (err) {
+      console.error('Download failed:', err);
+      alert('엑셀 다운로드 중 오류가 발생했습니다.');
+    }
+  };
+
   if (!user) return null;
 
   return (
@@ -107,6 +165,15 @@ export default function ListPage() {
         <div className="max-w-md mx-auto px-4 h-14 flex items-center justify-between">
           <h1 className="text-lg font-bold text-gray-800">Blood Press Log</h1>
           <div className="flex items-center space-x-2">
+            <button
+              onClick={handleDownloadExcel}
+              className="p-2 text-gray-600 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
+              title="엑셀 다운로드"
+            >
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+              </svg>
+            </button>
             <span className="text-sm text-gray-500">{user.username}</span>
             <Link 
               href="/writer"
@@ -131,7 +198,7 @@ export default function ListPage() {
                   type="date"
                   value={startDate}
                   onChange={(e) => setStartDate(e.target.value)}
-                  className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-200"
+                  className="w-full px-3 py-2 text-sm bg-white border-2 border-gray-400 rounded-lg focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-200 text-gray-800"
                 />
               </div>
               <span className="text-gray-400 pt-5">~</span>
@@ -141,7 +208,7 @@ export default function ListPage() {
                   type="date"
                   value={endDate}
                   onChange={(e) => setEndDate(e.target.value)}
-                  className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-200"
+                  className="w-full px-3 py-2 text-sm bg-white border-2 border-gray-400 rounded-lg focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-200 text-gray-800"
                 />
               </div>
             </div>

@@ -30,7 +30,7 @@ function InputField({
         value={value}
         onChange={(e) => onChange(e.target.value)}
         placeholder={placeholder}
-        className="w-full max-w-20 h-12 text-center text-lg font-semibold border-2 border-gray-300 rounded-lg focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-200"
+        className="w-full max-w-20 h-12 text-center text-lg font-semibold text-black border-2 border-gray-300 rounded-lg focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-200"
       />
     </div>
   );
@@ -190,19 +190,6 @@ export default function WriterPage() {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      {/* Header */}
-      <header className="bg-white shadow-sm sticky top-0 z-10">
-        <div className="max-w-md mx-auto px-4 h-14 flex items-center justify-between">
-          <h1 className="text-lg font-bold text-gray-800">Blood Press Log</h1>
-          <Link
-            href="/list"
-            className="px-4 py-2 text-sm font-medium text-gray-600 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors"
-          >
-            list
-          </Link>
-        </div>
-      </header>
-
       {/* Main Content */}
       <main className="max-w-md mx-auto px-4 py-6 space-y-6">
         {/* 사진 촬영 영역 */}
