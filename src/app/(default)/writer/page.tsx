@@ -89,10 +89,11 @@ export default function WriterPage() {
   const [measuredDate, setMeasuredDate] = useState(() => {
     return new Date().toISOString().split('T')[0];
   });
+  const [period, setPeriod] = useState('아침');
 
   const [capturedImage, setCapturedImage] = useState<string | null>(null);
   const [recognizing, setRecognizing] = useState(false);
-  const fileInputRef = useRef<HTMLInputElement>(null);
+  const photoInputRef = useRef<HTMLInputElement>(null);
   const nextSlotRef = useRef<'first' | 'second'>('first');
 
   useEffect(() => {
@@ -104,8 +105,12 @@ export default function WriterPage() {
     setUser(JSON.parse(stored));
   }, [router]);
 
-  const handleCameraClick = () => {
-    fileInputRef.current?.click();
+  const handlePhotoAreaClick = () => {
+    photoInputRef.current?.click();
+  };
+
+  const handleRemovePhoto = () => {
+    setCapturedImage(null);
   };
 
   const handleImageCapture = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -203,7 +208,8 @@ export default function WriterPage() {
           high,
           low,
           plus,
-          measuredAt: measuredDate
+          measuredAt: measuredDate,
+          period
         })
       });
 
@@ -232,11 +238,11 @@ export default function WriterPage() {
 
       {/* Content */}
       <div className="max-w-md mx-auto px-4 pt-4 pb-6 space-y-3">
-        {/* Camera Section */}
+        {/* Photo Section */}
         <div className="bg-white rounded-xl overflow-hidden">
           <div
-            onClick={handleCameraClick}
-            className="w-full aspect-[2/1] bg-gray-50 flex flex-col items-center justify-center cursor-pointer active:bg-gray-100 transition-colors"
+            onClick={handlePhotoAreaClick}
+            className="w-full aspect-[2/1] bg-gray-50 flex flex-col items-center justify-center relative cursor-pointer active:bg-gray-100 transition-colors"
           >
             {capturedImage ? (
               <img
@@ -245,25 +251,37 @@ export default function WriterPage() {
                 className="w-full h-full object-cover"
               />
             ) : (
-              <>
-                <svg className="w-10 h-10 text-gray-300 mb-1.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" />
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M15 13a3 3 0 11-6 0 3 3 0 016 0z" />
+              <div className="flex flex-col items-center gap-3">
+                <svg className="w-10 h-10 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
                 </svg>
-                <span className="text-sm text-gray-400">혈압기 화면을 촬영하세요</span>
-              </>
+                <span className="text-sm text-gray-400">탭하여 사진 추가</span>
+              </div>
             )}
           </div>
+
+          {/* Hidden Input for Photo Selection */}
           <input
-            ref={fileInputRef}
+            ref={photoInputRef}
             type="file"
             accept="image/*"
-            capture="environment"
             onChange={handleImageCapture}
             className="hidden"
           />
 
-          {/* OCR buttons */}
+          {/* Photo actions */}
+          {capturedImage && (
+            <div className="px-4 py-2 flex justify-end">
+              <button
+                onClick={handleRemovePhoto}
+                className="text-xs text-gray-400 hover:text-red-500 transition-colors"
+              >
+                사진 삭제
+              </button>
+            </div>
+          )}
+
+          {/* OCR button */}
           <div className="px-4 py-3 flex gap-2">
             <button
               onClick={handleRecognize}
@@ -288,15 +306,30 @@ export default function WriterPage() {
           </div>
         </div>
 
-        {/* Date Picker */}
-        <div className="bg-white rounded-xl px-4 py-3 flex items-center justify-between">
-          <span className="text-sm text-gray-500">측정일</span>
-          <input
-            type="date"
-            value={measuredDate}
-            onChange={(e) => setMeasuredDate(e.target.value)}
-            className="text-sm font-medium text-gray-800 bg-transparent border-none focus:outline-none text-right"
-          />
+        {/* Date and Period Picker */}
+        <div className="bg-white rounded-xl px-4 py-3 space-y-3">
+          <div className="flex items-center justify-between">
+            <span className="text-sm text-gray-500">측정일</span>
+            <input
+              type="date"
+              value={measuredDate}
+              onChange={(e) => setMeasuredDate(e.target.value)}
+              className="text-sm font-medium text-gray-800 bg-transparent border-none focus:outline-none text-right"
+            />
+          </div>
+          <div className="flex items-center justify-between border-t border-gray-100 pt-3">
+            <span className="text-sm text-gray-500">시간대</span>
+            <select
+              value={period}
+              onChange={(e) => setPeriod(e.target.value)}
+              className="text-sm font-medium text-gray-800 bg-transparent border-none focus:outline-none text-right cursor-pointer"
+            >
+              <option value="아침">아침</option>
+              <option value="오전">오전</option>
+              <option value="오후">오후</option>
+              <option value="저녁">저녁</option>
+            </select>
+          </div>
         </div>
 
         {/* First Measurement */}

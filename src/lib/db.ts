@@ -38,13 +38,14 @@ export function saveBloodPressure(
   high: number,
   low: number,
   plus: number,
-  measuredAt: string
+  measuredAt: string,
+  period: string = '아침'
 ) {
   const db = getDatabase();
   const stmt = db.prepare(
-    'INSERT INTO blood (user_id, high, low, plus, measured_at) VALUES (?, ?, ?, ?, ?)'
+    'INSERT INTO blood (user_id, high, low, plus, measured_at, period) VALUES (?, ?, ?, ?, ?, ?)'
   );
-  const result = stmt.run(userId, high, low, plus, measuredAt);
+  const result = stmt.run(userId, high, low, plus, measuredAt, period);
   return { success: true, id: result.lastInsertRowid };
 }
 
@@ -75,7 +76,7 @@ export function getBloodPressureRecords(
     params.push(endDate);
   }
   
-  query += ' ORDER BY measured_at DESC LIMIT ? OFFSET ?';
+  query += ' ORDER BY created_at DESC LIMIT ? OFFSET ?';
   
   const records = db.prepare(query).all(...params, limit, offset);
   const { total } = db.prepare(countQuery).get(...params) as { total: number };

@@ -5,7 +5,7 @@ import { saveBloodPressure, getBloodPressureRecords } from '@/lib/db';
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const { userId, high, low, plus, measuredAt } = body;
+    const { userId, high, low, plus, measuredAt, period } = body;
     
     // 필수 필드 검증
     if (!userId || high === undefined || low === undefined || plus === undefined) {
@@ -20,7 +20,8 @@ export async function POST(request: NextRequest) {
       Number(high),
       Number(low),
       Number(plus),
-      measuredAt || new Date().toISOString().split('T')[0]
+      measuredAt || new Date().toISOString().split('T')[0],
+      period || '아침'
     );
     
     return NextResponse.json({

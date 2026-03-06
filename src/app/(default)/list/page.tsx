@@ -10,6 +10,7 @@ interface BloodPressureRecord {
   low: number;
   plus: number;
   measured_at: string;
+  period: string;
   created_at: string;
 }
 
@@ -99,13 +100,23 @@ export default function ListPage() {
 
   const formatDate = (dateString: string) => {
     const date = new Date(dateString);
-    return `${date.getMonth() + 1}/${date.getDate()}`;
+    // Treat as UTC to avoid timezone offset issues
+    return date.toLocaleDateString('ko-KR', {
+      timeZone: 'UTC',
+      month: 'numeric',
+      day: 'numeric'
+    });
   };
 
   const formatDateFull = (dateString: string) => {
     const date = new Date(dateString);
     const days = ['일', '월', '화', '수', '목', '금', '토'];
-    return `${date.getFullYear()}.${date.getMonth() + 1}.${date.getDate()} (${days[date.getDay()]})`;
+    // Use UTC methods to avoid timezone offset
+    const year = date.getUTCFullYear();
+    const month = date.getUTCMonth() + 1;
+    const day = date.getUTCDate();
+    const dayOfWeek = days[date.getUTCDay()];
+    return `${year}.${month}.${day} (${dayOfWeek})`;
   };
 
   const handleLogout = () => {
@@ -137,6 +148,7 @@ export default function ListPage() {
       const excelData = data.records.map((record, index) => ({
         'No': index + 1,
         '측정일': formatDateFull(record.measured_at),
+        '시간대': record.period || '아침',
         '수축기(High)': record.high,
         '이완기(Low)': record.low,
         '맥박(Plus)': record.plus
@@ -146,6 +158,7 @@ export default function ListPage() {
       ws['!cols'] = [
         { wch: 5 },
         { wch: 20 },
+        { wch: 10 },
         { wch: 12 },
         { wch: 12 },
         { wch: 12 }
@@ -275,13 +288,16 @@ export default function ListPage() {
                   key={record.id}
                   className="bg-white rounded-xl px-4 py-3 flex items-center gap-4"
                 >
-                  {/* Date */}
-                  <div className="flex-shrink-0 text-center w-12">
+                  {/* Date & Period */}
+                  <div className="flex-shrink-0 text-center w-14">
                     <p className="text-lg font-bold text-gray-800 leading-none">
-                      {new Date(record.measured_at).getDate()}
+                      {new Date(record.measured_at).getUTCDate()}
                     </p>
                     <p className="text-[10px] text-gray-400 mt-0.5">
-                      {new Date(record.measured_at).getFullYear()}.{new Date(record.measured_at).getMonth() + 1}
+                      {new Date(record.measured_at).getUTCFullYear()}.{new Date(record.measured_at).getUTCMonth() + 1}
+                    </p>
+                    <p className="text-[10px] font-medium text-blue-600 mt-0.5">
+                      {record.period || '아침'}
                     </p>
                   </div>
 
