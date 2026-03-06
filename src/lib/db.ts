@@ -88,3 +88,11 @@ export function getBloodPressureRecords(
     totalPages: Math.ceil(total / limit)
   };
 }
+
+// 혈압 데이터 삭제
+export function deleteBloodPressure(id: number, userId: number) {
+  const db = getDatabase();
+  const stmt = db.prepare('DELETE FROM blood WHERE id = ? AND user_id = ?');
+  const result = stmt.run(id, userId);
+  return { success: result.changes > 0, deleted: result.changes };
+}

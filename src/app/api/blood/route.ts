@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { saveBloodPressure, getBloodPressureRecords } from '@/lib/db';
+import { saveBloodPressure, getBloodPressureRecords, deleteBloodPressure } from '@/lib/db';
 
 // POST: 혈압 데이터 저장
 export async function POST(request: NextRequest) {
@@ -65,6 +65,42 @@ export async function GET(request: NextRequest) {
     return NextResponse.json(records);
   } catch (error) {
     console.error('Error fetching blood pressure:', error);
+    return NextResponse.json(
+      { error: 'Internal server error' },
+      { status: 500 }
+    );
+  }
+}
+
+// DELETE: 혈압 데이터 삭제
+export async function DELETE(request: NextRequest) {
+  try {
+    const { searchParams } = new URL(request.url);
+    const id = searchParams.get('id');
+    const userId = searchParams.get('userId');
+    
+    if (!id || !userId) {
+      return NextResponse.json(
+        { error: 'id and userId are required' },
+        { status: 400 }
+      );
+    }
+    
+    const result = deleteBloodPressure(Number(id), Number(userId));
+    
+    if (!result.success) {
+      return NextResponse.json(
+        { error: 'Record not found or unauthorized' },
+        { status: 404 }
+      );
+    }
+    
+    return NextResponse.json({
+      success: true,
+      message: 'Record deleted successfully'
+    });
+  } catch (error) {
+    console.error('Error deleting blood pressure:', error);
     return NextResponse.json(
       { error: 'Internal server error' },
       { status: 500 }

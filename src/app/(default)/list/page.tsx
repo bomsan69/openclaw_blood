@@ -98,6 +98,30 @@ export default function ListPage() {
     if (user) fetchRecords(user.id, 1);
   };
 
+  const handleDelete = async (recordId: number) => {
+    if (!user) return;
+    
+    const confirmed = confirm('이 기록을 삭제하시겠습니까?');
+    if (!confirmed) return;
+
+    try {
+      const res = await fetch(`/api/blood?id=${recordId}&userId=${user.id}`, {
+        method: 'DELETE'
+      });
+
+      if (res.ok) {
+        // 삭제 성공 시 목록 새로고침
+        fetchRecords(user.id, currentPage);
+      } else {
+        const data = await res.json();
+        alert(data.error || '삭제에 실패했습니다.');
+      }
+    } catch (err) {
+      console.error('Failed to delete record:', err);
+      alert('삭제 중 오류가 발생했습니다.');
+    }
+  };
+
   const formatDate = (dateString: string) => {
     const date = new Date(dateString);
     // Treat as UTC to avoid timezone offset issues
@@ -322,6 +346,17 @@ export default function ListPage() {
                   <span className={`flex-shrink-0 text-[11px] font-semibold px-2.5 py-1 rounded-full ${level.color} ${level.bg}`}>
                     {level.label}
                   </span>
+
+                  {/* Delete Button */}
+                  <button
+                    onClick={() => handleDelete(record.id)}
+                    className="flex-shrink-0 p-2 rounded-full text-gray-400 hover:text-red-600 hover:bg-red-50 active:bg-red-100 transition-colors"
+                    aria-label="삭제"
+                  >
+                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                    </svg>
+                  </button>
                 </div>
               );
             })}
